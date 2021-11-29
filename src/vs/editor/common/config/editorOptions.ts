@@ -3265,9 +3265,9 @@ export interface IUnicodeHighlightOptions {
 	ambiguousCharacters?: boolean | DeriveFromWorkspaceTrust;
 	includeComments?: boolean | DeriveFromWorkspaceTrust;
 	/**
-	 * A list of allowed code points in a single string.
+	 * A map of allowed characters (true: allowed).
 	*/
-	allowedCharacters?: string;
+	allowedCharacters?: Record<string, true>;
 }
 
 /**
@@ -3293,7 +3293,7 @@ class UnicodeHighlight extends BaseEditorOption<EditorOption.unicodeHighlighting
 			invisibleCharacters: deriveFromWorkspaceTrust,
 			ambiguousCharacters: deriveFromWorkspaceTrust,
 			includeComments: deriveFromWorkspaceTrust,
-			allowedCharacters: '',
+			allowedCharacters: {},
 		};
 
 		super(
@@ -3329,9 +3329,12 @@ class UnicodeHighlight extends BaseEditorOption<EditorOption.unicodeHighlighting
 				},
 				[unicodeHighlightConfigKeys.allowedCharacters]: {
 					restricted: true,
-					type: 'string',
+					type: 'object',
 					default: defaults.allowedCharacters,
-					description: nls.localize('unicodeHighlight.allowedCharacters', "Defines allowed characters that are not being highlighted.")
+					description: nls.localize('unicodeHighlight.allowedCharacters', "Defines allowed characters that are not being highlighted."),
+					additionalProperties: {
+						type: 'boolean'
+					}
 				},
 			}
 		);
@@ -3347,16 +3350,22 @@ class UnicodeHighlight extends BaseEditorOption<EditorOption.unicodeHighlighting
 			invisibleCharacters: primitiveSet<boolean | DeriveFromWorkspaceTrust>(input.invisibleCharacters, deriveFromWorkspaceTrust, [true, false, deriveFromWorkspaceTrust]),
 			ambiguousCharacters: primitiveSet<boolean | DeriveFromWorkspaceTrust>(input.ambiguousCharacters, deriveFromWorkspaceTrust, [true, false, deriveFromWorkspaceTrust]),
 			includeComments: primitiveSet<boolean | DeriveFromWorkspaceTrust>(input.includeComments, deriveFromWorkspaceTrust, [true, false, deriveFromWorkspaceTrust]),
-			allowedCharacters: string(input.allowedCharacters, ''),
+			allowedCharacters: this.validateAllowedCharacters(_input.allowedCharacters, this.defaultValue.allowedCharacters),
 		};
 	}
-}
 
-function string(value: unknown, defaultValue: string): string {
-	if (typeof value !== 'string') {
-		return defaultValue;
+	private validateAllowedCharacters(map: unknown, defaultValue: Record<string, true>): Record<string, true> {
+		if ((typeof map !== 'object') || !map) {
+			return defaultValue;
+		}
+		const result: Record<string, true> = {};
+		for (const [key, value] of Object.entries(map)) {
+			if (value === true) {
+				result[key] = true;
+			}
+		}
+		return result;
 	}
-	return value;
 }
 
 //#endregion

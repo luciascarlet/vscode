@@ -159,7 +159,7 @@ export class UnicodeHighlighter extends Disposable implements IEditorContributio
 			ambiguousCharacters: options.ambiguousCharacters,
 			invisibleCharacters: options.invisibleCharacters,
 			includeComments: options.includeComments,
-			allowedCodePoints: Array.from(options.allowedCharacters).map(c => c.codePointAt(0)!),
+			allowedCodePoints: Object.keys(options.allowedCharacters).map(c => c.codePointAt(0)!),
 		};
 
 		if (this._editorWorkerService.canComputeUnicodeHighlights(this._editor.getModel().uri)) {
@@ -207,7 +207,7 @@ function resolveOptions(trusted: boolean, options: InternalUnicodeHighlightOptio
 		ambiguousCharacters: options.ambiguousCharacters !== deriveFromWorkspaceTrust ? options.ambiguousCharacters : defaults.ambiguousCharacters,
 		invisibleCharacters: options.invisibleCharacters !== deriveFromWorkspaceTrust ? options.invisibleCharacters : defaults.invisibleCharacters,
 		includeComments: options.includeComments !== deriveFromWorkspaceTrust ? options.includeComments : defaults.includeComments,
-		allowedCharacters: options.allowedCharacters ?? [],
+		allowedCharacters: options.allowedCharacters ?? {},
 	};
 }
 
@@ -281,7 +281,6 @@ class DocumentUnicodeHighlighter extends Disposable {
 }
 
 class ViewportUnicodeHighlighter extends Disposable {
-
 	private readonly _model: ITextModel = this._editor.getModel();
 	private readonly _updateSoon: RunOnceScheduler;
 	private _decorationIds = new Set<string>();
@@ -597,6 +596,23 @@ interface ShowExcludeOptionsArgs {
 	reason: UnicodeHighlighterReason['kind'];
 }
 
+async function excludeCharFromBeingHighlighted(configurationService: IConfigurationService, charCodes: number[]) {
+	const existingValue = configurationService.getValue(unicodeHighlightConfigKeys.allowedCharacters);
+
+	let value: Record<string, boolean>;
+	if ((typeof existingValue === 'object') && existingValue) {
+		value = existingValue as any;
+	} else {
+		value = {};
+	}
+
+	for (const charCode of charCodes) {
+		value[String.fromCodePoint(charCode)] = true;
+	}
+
+	await configurationService.updateValue(unicodeHighlightConfigKeys.allowedCharacters, value, ConfigurationTarget.USER);
+}
+
 export class ShowExcludeOptions extends EditorAction {
 	public static ID = 'editor.action.unicodeHighlight.showExcludeOptions';
 	constructor() {
@@ -623,18 +639,7 @@ export class ShowExcludeOptions extends EditorAction {
 		const options: ExtendedOptions[] = [
 			{
 				label: nls.localize('unicodeHighlight.excludeCharFromBeingHighlighted', 'Exclude {0} from being highlighted', `U+${codePoint.toString(16)} "${char}"`),
-				run: async () => {
-					const existingValue = configurationService.getValue(unicodeHighlightConfigKeys.allowedCharacters);
-					let value: string;
-					if (typeof existingValue === 'string') {
-						value = existingValue;
-					} else {
-						value = '';
-					}
-
-					value += char;
-					await configurationService.updateValue(unicodeHighlightConfigKeys.allowedCharacters, value, ConfigurationTarget.USER);
-				}
+				run: () => excludeCharFromBeingHighlighted(configurationService, [codePoint])
 			},
 		];
 
