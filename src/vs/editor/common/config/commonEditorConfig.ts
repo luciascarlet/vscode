@@ -111,26 +111,11 @@ class EditorConfiguration2 {
 		return result;
 	}
 
-	private static _deepEquals<T>(a: T, b: T): boolean {
-		if (typeof a !== 'object' || typeof b !== 'object') {
-			return (a === b);
-		}
-		if (Array.isArray(a) || Array.isArray(b)) {
-			return (Array.isArray(a) && Array.isArray(b) ? arrays.equals(a, b) : false);
-		}
-		for (let key in a) {
-			if (!EditorConfiguration2._deepEquals(a[key], b[key])) {
-				return false;
-			}
-		}
-		return true;
-	}
-
 	public static checkEquals(a: ComputedEditorOptions, b: ComputedEditorOptions): ConfigurationChangedEvent | null {
 		const result: boolean[] = [];
 		let somethingChanged = false;
 		for (const editorOption of editorOptionsRegistry) {
-			const changed = !EditorConfiguration2._deepEquals(a._read(editorOption.id), b._read(editorOption.id));
+			const changed = !objects.equals(a._read(editorOption.id), b._read(editorOption.id));
 			result[editorOption.id] = changed;
 			if (changed) {
 				somethingChanged = true;
@@ -382,7 +367,7 @@ export abstract class CommonEditorConfiguration extends Disposable implements IC
 		return EditorConfiguration2.computeOptions(this._validatedOptions, env);
 	}
 
-	private static _subsetEquals(base: { [key: string]: any }, subset: { [key: string]: any }): boolean {
+	private static _topLevelSubsetEquals(base: { [key: string]: any }, subset: { [key: string]: any }): boolean {
 		for (const key in subset) {
 			if (hasOwnProperty.call(subset, key)) {
 				const subsetValue = subset[key];
@@ -398,7 +383,7 @@ export abstract class CommonEditorConfiguration extends Disposable implements IC
 					continue;
 				}
 				if (baseValue && typeof baseValue === 'object' && subsetValue && typeof subsetValue === 'object') {
-					if (!this._subsetEquals(baseValue, subsetValue)) {
+					if (!objects.equals(baseValue, subsetValue)) {
 						return false;
 					}
 					continue;
@@ -415,10 +400,10 @@ export abstract class CommonEditorConfiguration extends Disposable implements IC
 			return;
 		}
 		const newOptions = deepCloneAndMigrateOptions(_newOptions);
-		if (CommonEditorConfiguration._subsetEquals(this._rawOptions, newOptions)) {
+		if (CommonEditorConfiguration._topLevelSubsetEquals(this._rawOptions, newOptions)) {
 			return;
 		}
-		this._rawOptions = objects.mixin(this._rawOptions, newOptions || {});
+		this._rawOptions = Object.assign(this._rawOptions, newOptions || {});
 		this._readOptions = EditorConfiguration2.readOptions(this._rawOptions);
 		this._validatedOptions = EditorConfiguration2.validateOptions(this._readOptions);
 
